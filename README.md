@@ -227,7 +227,8 @@ logic are plain C++ and run on your computer:
 ## Companion project
 
 [DroidNet-HoloFan](https://github.com/travisccook/DroidNet-HoloFan) is the
-firmware for the holofan this lift carries. The mesh libraries lib/WcbCore,
+firmware for the holofan this lift carries; its clips are made and loaded
+with [DroidNet Signal Booster](https://github.com/travisccook/DroidNetSignalBooster-releases). The mesh libraries lib/WcbCore,
 lib/NodeConfig, lib/MaintCore and lib/LiftCommands are shared by both
 repositories and kept identical; a change to one copy is made to both.
 
