@@ -16,6 +16,9 @@ replacement firmware that puts the holofan itself on the same mesh.
 
 This project exists because other people built things and shared them.
 
+- **Todd Word and Michael Bean: the BeanLifter.** They broke ground with the
+  BeanLifter and took the holofan in a droid from a good idea to a working
+  build.
 - **Greg Hulette: the Wireless Communication Board (WCB)**
   <https://github.com/greghulette/Wireless_Communication_Board-WCB> (GPL-3.0)
   and **WCB_Client** <https://github.com/greghulette/WCBClient> (MIT).
