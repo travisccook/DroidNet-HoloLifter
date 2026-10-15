@@ -1,7 +1,7 @@
 # HoloLifter command reference (#HL over the WCB mesh)
 
 The HoloLifter and the HoloFan are both nodes on the droid's WCB ESP-NOW mesh,
-and a droid controller reaches them through any WCB. This page covers the
+and a droid controller reaches them through any WCB. This reference covers the
 HoloLifter (node 15) and the #HLZ node commands both nodes share; the fan's
 own commands are documented in DroidNet-HoloFan.
 

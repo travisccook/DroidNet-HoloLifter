@@ -24,6 +24,7 @@ pio run -t upload           # flash over USB
 pio device monitor          # USB console, 115200 baud
 pio test -e native          # unit tests on the host (Unity)
 pio test -e native -f "test_wcb_*"   # one family of suites
+python3 -B -m unittest discover -s tools -p 'test_*.py'   # leak scan, README copy
 ```
 
 `pio run` builds only the real firmware. The `esp32thing_plus_rollbacktest`
@@ -98,7 +99,9 @@ Commands are `#HL<COMMAND>[<PARAM>]` terminated by `\r`, sent through a WCB as
 broadcast starting with `#HL:`; actions are silent even on error. The `#HL`
 prefix avoids the prefixes of other droid systems (@ MarcDuino, ? and ; WCB,
 <> Vocalizer, DT/S FlthyHPs, #LE JawaLite). The full reference is
-docs/SERIAL_COMMANDS.md; keep it in step with lib/LiftCommands.
+docs/SERIAL_COMMANDS.md; keep it in step with lib/LiftCommands. README.md
+carries a copy under "Command reference": change both together
+(tools/test_readme_commands.py checks).
 
 ## Documentation rules
 
