@@ -12,8 +12,8 @@
 #include "motion_config.h"  // motion constants (also used by the native tests)
 
 // ===== Firmware Version =====
-#define HOLOLIFTER_VERSION "1.0.0"
-#define HOLOLIFTER_DATE    "2025-11-17"
+#define HOLOLIFTER_VERSION "1.0.1"   // #HLZKS / #HLZKP also take plain text after '='
+#define HOLOLIFTER_DATE    "2026-10-15"
 
 // ===== Hardware Pin Assignments =====
 

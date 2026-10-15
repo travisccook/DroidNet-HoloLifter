@@ -18,8 +18,7 @@
  *   - Deceleration before soft limits and goto targets
  *
  * Author: HoloLifter Project
- * Version: 1.0.0
- * Date: 2025-11-17
+ * Version: see HOLOLIFTER_VERSION in include/config.h
  */
 
 #include <Arduino.h>
