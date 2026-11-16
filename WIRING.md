@@ -484,6 +484,10 @@ Before applying power, verify:
 **Motor doesn't move:**
 - Check 5V at motor driver VIN with multimeter
 - Run I2C scanner - device should appear at 0x5D
+- Firmware 1.0.2 (not yet tried on a lift): without the driver the boot log
+  says "Motor driver not found", the console and the mesh still start,
+  `status` shows ERROR and every move is refused until the wiring is fixed
+  and the board restarted
 - Swap A1/A2 wires if direction is inverted
 
 **Encoder doesn't count:**

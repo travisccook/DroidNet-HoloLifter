@@ -24,7 +24,7 @@ pio run -t upload           # flash over USB
 pio device monitor          # USB console, 115200 baud
 pio test -e native          # unit tests on the host (Unity)
 pio test -e native -f "test_wcb_*"   # one family of suites
-python3 -B -m unittest discover -s tools -p 'test_*.py'   # leak scanner
+python3 -B -m unittest discover -s tools -p 'test_*.py'   # leak scanner, hlcon
 ```
 
 Run `sh tools/install_hooks.sh` once per clone to install the pre-commit

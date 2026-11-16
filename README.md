@@ -57,7 +57,7 @@ authors.
   broken wire reads as "limit reached" and stops the motor. Test both by hand
   before every motion test.
 - It never moves on power-up: homing runs only when you ask for it, or before
-  the first move. Even so, power it up the first few times with a hand on the
+  the first up or goto. Even so, power it up the first few times with a hand on the
   power switch.
 - At full speed the lift can coast onto the limit switches. Start slow.
 - The droid's 24 V battery and the buck converter can destroy parts if wired
@@ -74,6 +74,11 @@ project. Product names belong to their owners.
 One lift, in one droid, since October 2026: motion, homing, limit switches,
 the fan relay, the mesh node, and over-the-air updates with automatic
 rollback. Nothing else has been tested. If you build one, you are the second.
+
+Firmware 1.0.2 has only been tested on a computer (the unit tests): it has
+not yet been compiled for the board or run on the lift. What it changes, and
+what still has to be tried on the lift, is in docs/TESTING_PLAN.md,
+section 5.
 
 ---
 
@@ -146,13 +151,16 @@ broadcast-out ports.
 Motion:
 
     #HLU / #HLD     move up / down to the soft limit, slowing before it
-    #HLS            stop now (also cuts the holofan's power)
+    #HLS            stop now (also cuts the holofan's power); an error
+                    stays an error
     #HLH            run homing
     #HLG<pos>       go to a position, in encoder counts
     #HLX            clear an error (e.g. after a stall); keeps homing
 
 The lift never homes by itself at power-up. The first #HLU or #HLG homes it
 first; #HLD before homing runs at homing speed down to the lower switch.
+A move ends in an error if the motor stalls or the move takes longer than
+30 s; only #HLX clears an error.
 
 Holofan power:
 
@@ -223,6 +231,13 @@ The mesh client, the command parser, the motion profile and the maintenance
 logic are plain C++ and run on your computer:
 
     pio test -e native
+
+The tools (tools/hlcon.py, a USB console helper, and tools/check_private.py,
+the private-data scan) have their own tests. Run tools/install_hooks.sh once
+per clone to make git run the scan before every commit:
+
+    python3 -B -m unittest discover -s tools -p 'test_*.py'
+    sh tools/install_hooks.sh
 
 ---
 

@@ -509,6 +509,8 @@ However, for clean C2B5 integration, it's recommended to **require the `#HL` pre
 **Wrong:** Sending commands with `\n` only
 **Right:** Send commands with `\r` (or `\r\n`)
 
+(Today's USB console also takes `\n` alone; see 5 below.)
+
 ### 2. Case Sensitivity
 
 Commands should be **case insensitive** after prefix:

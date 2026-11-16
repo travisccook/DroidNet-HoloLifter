@@ -60,6 +60,11 @@ lib/NodeConfig, lib/MaintCore, lib/LiftCommands) with this one.
 - At full speed the lift can coast onto the limit switches instead of stopping
   at the soft limit, and a goto can stall short of its target. Test slowly
   first (README, "First setup").
+- Firmware 1.0.2 (code-review fixes: console line endings, #HLS retries, an
+  ERROR that stays through a stop, the stall check and the 30 s limit on
+  every move, a boot without the motor driver, OTA validity) has run only in
+  the native tests. Compile it and work through docs/TESTING_PLAN.md,
+  section 5, on the lift.
 
 ## Possible later work (not planned)
 

@@ -72,6 +72,15 @@ Motion (silent):
                     driver not found" cannot be cleared: fix the wiring and
                     restart.
 
+New in 1.0.2, and not yet tried on a lift (docs/TESTING_PLAN.md, section 5):
+a repeated #HLU during homing, the ignored #HLS retry, #HLS leaving an ERROR
+in place, the 30 s limit on every move (counted from the move command;
+homing has its own 15 s), the stall check on #HLU while the lower switch is
+still pressed, and the boot without a motor driver: the console and the mesh
+still start, #HLQ shows state=ERROR with
+error=Motor_driver_not_found_-_check_I2C_wiring,_then_restart, and every
+move is refused (before 1.0.2 the firmware halted at boot).
+
 Configuration (silent; speed and margin auto-save):
 
     #HLV<0-255>     speed, clamped to 50-255 (below 50 the lift stalls uphill)
@@ -159,7 +168,11 @@ stop, reset, speed, margin, relay, ...) and adds:
                     lower case is retried in upper case
 
 A console line ends with CR, LF or CRLF. Lines are handled one per loop
-pass (about 10 ms), in the order received.
+pass (about 10 ms), in the order received. `stop` leaves an ERROR in place,
+as #HLS does; `home` and `reset` / `clear` answer "ERROR <reason>" when they
+are refused. (1.0.2, not yet tried on a lift: this paragraph, the strict
+numbers and the `hl` pass-through above. Before 1.0.2 a CRLF line lost its
+arguments.)
 
     mesh            show mesh config and counters (passwords hidden)
     mesh pw <pw>                 mesh password (mesh is OFF until set)

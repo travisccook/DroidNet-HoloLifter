@@ -13,8 +13,8 @@
                     the form sleep:N sends nothing and listens for N seconds.
 
 By default the tool pulses the board's EN line through RTS when it opens the
-port, which REBOOTS the lift: the homing state is lost (the next up, down or
-goto homes first) and the relay goes back to its power-up state, so the
+port, which REBOOTS the lift: the homing state is lost (the next up or goto
+homes first) and the relay goes back to its power-up state, so the
 holofan's power changes. Use --noreset to talk to a lift that must keep
 running; opening a serial port can still reset some boards by itself.
 
