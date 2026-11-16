@@ -34,6 +34,7 @@ MotionController::MotionController(MotorControl& motor, Encoder& encoder,
       homed(false),
       upperLimitCalibrated(false), lowerLimitCalibrated(false),
       softLimitLower(0), softLimitUpper(10000), softLimitMargin(SOFT_LIMIT_MARGIN), homedTravel(0),
+      motorMissing(false),
       restStopMs(0), restPos(0), restUpper(false), restLower(false),
       lastPositionTime(0), lastPosition(0) {
 
@@ -114,6 +115,13 @@ bool MotionController::moveUp(int32_t distance) {
 
     // Not homed: run the homing sequence first, then continue up
     if (motionprofile::homeBeforeManual(1, homed)) {
+        if (state == HOMING) {
+            // Already homing (a repeated `up`): do not start over, just
+            // make `up` the move that follows
+            cancelPendingMoves();
+            upAfterHoming = true;
+            return true;
+        }
         DEBUG_PRINTLN(F("UP before homing - homing first"));
         home();
         upAfterHoming = (state == HOMING);
@@ -121,6 +129,7 @@ bool MotionController::moveUp(int32_t distance) {
     }
 
     setState(MANUAL_UP);
+    stateStartTime = millis();  // movement timeout runs from this command
     return true;
 }
 
@@ -155,6 +164,7 @@ bool MotionController::moveDown(int32_t distance) {
     }
 
     setState(MANUAL_DOWN);
+    stateStartTime = millis();  // movement timeout runs from this command
     return true;
 }
 
@@ -166,7 +176,11 @@ bool MotionController::gotoPosition(int32_t target) {
     // Check if homed - auto-home if enabled
     if (!homed) {
         #if AUTO_HOME_ON_FIRST_MOVE
-        home();  // Auto-home on first movement
+        if (state == HOMING) {
+            cancelPendingMoves();  // already homing: replace the queued move, do not start over
+        } else {
+            home();  // Auto-home on first movement
+        }
         // finishHoming() goes on to the target, checked against the new soft limits
         gotoAfterHoming = (state == HOMING);
         pendingTarget = target;
@@ -219,24 +233,36 @@ bool MotionController::gotoPosition(int32_t target) {
     lastPositionTime = millis();
 
     setState(MOVING_TO_TARGET);
+    stateStartTime = millis();  // movement timeout runs from this command
     return true;
 }
 
 void MotionController::stop() {
-    cancelPendingMoves();  // a stop also cancels a move queued behind homing
-    homingNeedBackoff = false;
-    homingBackedOff = false;
-    setState(STOPPED);
+    // Motor first: nothing (state change, console output) comes before it
     motor.stop();
     currentSpeed = 0;
 
     // FAIL-SAFE: Turn off relay (holofan) on emergency stop
     failsafeHolofanOff();
+
+    cancelPendingMoves();  // a stop also cancels a move queued behind homing
+    homingNeedBackoff = false;
+    homingBackedOff = false;
+    // A fault stays latched: only `clear` / #HLX leaves ERROR (a stop used to
+    // turn ERROR into STOPPED, from which the next move was accepted)
+    if (state != ERROR) {
+        setState(STOPPED);
+    }
 }
 
-void MotionController::home() {
+void MotionController::motorFault() {
+    motorMissing = true;
+    enterErrorState("Motor driver not found - check I2C wiring, then restart");
+}
+
+bool MotionController::home() {
     if (state == ERROR || checkWiring()) {
-        return;
+        return false;
     }
 
     DEBUG_PRINTLN(F("Starting comprehensive homing sequence"));
@@ -266,9 +292,13 @@ void MotionController::home() {
     // Reset stall detection to avoid false positive at start
     lastPosition = ENCODER_READ(encoder);
     lastPositionTime = millis();
+    return true;
 }
 
-void MotionController::clearError() {
+bool MotionController::clearError() {
+    if (motorMissing) {
+        return false;  // nothing to drive: the fault stays (errorMessage says why)
+    }
     if (state == ERROR || state == STOPPED) {
         motor.stop();  // Use stop() not brake() - allow platform to coast
         currentSpeed = 0;
@@ -276,6 +306,7 @@ void MotionController::clearError() {
         setState(IDLE);
         DEBUG_PRINTLN(F("Error cleared, returning to IDLE"));
     }
+    return true;
 }
 
 // ===== Status Queries =====
@@ -723,6 +754,10 @@ void MotionController::handleMovingToTarget() {
         return;
     }
 
+    if (checkMoveTimeout()) {
+        return;
+    }
+
     // Check stall
     if (checkStall()) {
         enterErrorState("Motor stalled");
@@ -770,9 +805,15 @@ void MotionController::handleManualUp() {
         return;
     }
 
-    // Check stall (skip if lower limit is pressed - moving away from limit)
-    if (!lowerLimit.isTriggered() && checkStall()) {
+    // Check stall. Also while the lower switch is still pressed (the lift
+    // starts on or just above it): moveUp() and finishHoming() restart the
+    // stall clock, and a jammed or disabled motor down there must be caught.
+    if (checkStall()) {
         enterErrorState("Motor stalled");
+        return;
+    }
+
+    if (checkMoveTimeout()) {
         return;
     }
 
@@ -823,6 +864,10 @@ void MotionController::handleManualDown() {
         return;
     }
 
+    if (checkMoveTimeout()) {
+        return;
+    }
+
     // Move down at target speed, slowing down before the lower soft limit;
     // homing speed until homed (no soft limits yet)
     int32_t remaining = ENCODER_READ(encoder) - softLimitLower;
@@ -853,6 +898,16 @@ bool MotionController::checkLimits(int8_t dir) {
         return true;
     }
     return false;
+}
+
+bool MotionController::checkMoveTimeout() {
+    // No move may run longer than MOVEMENT_TIMEOUT_MS (homing has its own
+    // HOMING_TIMEOUT_MS). stateStartTime is restarted by every move command.
+    if (millis() - stateStartTime <= MOVEMENT_TIMEOUT_MS) {
+        return false;
+    }
+    enterErrorState("Movement timeout");
+    return true;
 }
 
 bool MotionController::checkStall() {

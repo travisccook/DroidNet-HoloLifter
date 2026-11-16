@@ -37,7 +37,7 @@ see docs/SERIAL_COMMANDS.md.
 
 ## Phase 5: Advanced features
 
-Homing (never on power-up: on request, or before the first move), trapezoidal
+Homing (never on power-up: on request, or before the first up or goto), trapezoidal
 motion profiles (lib/MotionProfile), soft-limit margin, configuration saved in
 flash, error handling and the emergency stop (lib/MotionController).
 

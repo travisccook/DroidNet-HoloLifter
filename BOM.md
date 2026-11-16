@@ -60,7 +60,7 @@ playback runs over the WCB mesh (DroidNet-HoloFan).
 - No-Load Speed: ~80 RPM @ 5V (100 RPM @ 6V)
 - Stall Torque: 4.0 kg-cm (55 oz-in)
 - Gear Ratio: 297.92:1 (nominal 298:1)
-- Encoder: 12 CPR (motor shaft) = ~14,300 CPR (output shaft, quadrature 4x)
+- Encoder: 12 CPR (motor shaft, full quadrature) = ~3,575 CPR at the output shaft; the firmware counts half of that, ~1,788 (computed, not measured on the lift)
 - Encoder Output: Quadrature (A/B channels), 2.7-18V compatible
 
 ---

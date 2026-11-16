@@ -69,6 +69,19 @@ public:
     void disable();
 
     /**
+     * Maintenance mode: disable the driver without forgetting whether the
+     * user had it enabled; maintRestore() re-enables it only if enable() was
+     * the user's last word (not after disable() / #HLOF).
+     */
+    void maintDisable();
+    void maintRestore();
+
+    /**
+     * Whether begin() found the driver
+     */
+    bool isInitialized() const;
+
+    /**
      * Check if motor driver is ready (I2C communication OK)
      * @return true if driver responding
      */
@@ -98,6 +111,7 @@ private:
     int16_t currentSpeed;       // Current speed setting (last written)
     uint32_t lastWriteMs;       // millis() of the last drive write (for the refresh)
     bool initialized;           // Initialization flag
+    bool wantEnabled;           // enable()/disable() as last asked by the user
 
     /**
      * Convert signed speed to SCMD drive level and direction

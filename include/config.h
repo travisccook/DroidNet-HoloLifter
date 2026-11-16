@@ -12,8 +12,8 @@
 #include "motion_config.h"  // motion constants (also used by the native tests)
 
 // ===== Firmware Version =====
-#define HOLOLIFTER_VERSION "1.0.1"   // #HLZKS / #HLZKP also take plain text after '='
-#define HOLOLIFTER_DATE    "2026-10-15"
+#define HOLOLIFTER_VERSION "1.0.2"   // code-review fixes (console CRLF, #HLS retries, stall/timeout, OTA validity)
+#define HOLOLIFTER_DATE    "2026-11-16"
 
 // ===== Hardware Pin Assignments =====
 
@@ -48,9 +48,14 @@
 // ===== Position Control Constants =====
 
 // Encoder configuration (Pololu 5172: 298:1 Micro Metal Gearmotor HP 6V)
-#define ENCODER_CPR_MOTOR    12          // Counts per revolution at motor shaft
+// Pololu's 12 CPR already counts both edges of both channels. The firmware
+// attaches the encoder with attachHalfQuad (both edges of channel A only),
+// so it sees half of that: 6 counts per motor turn, about 1,788 per turn of
+// the output shaft. Computed from the datasheet; not measured on the lift.
+// Only the `encoder` console command prints it; no motion code depends on it.
+#define ENCODER_CPR_MOTOR    12          // Counts per motor-shaft revolution, full quadrature (Pololu)
 #define GEARBOX_RATIO        297.92f     // Gearbox ratio (298:1 nominal, 297.92:1 actual)
-#define ENCODER_CPR_OUTPUT   (ENCODER_CPR_MOTOR * GEARBOX_RATIO * 4)  // ~14,300 CPR (quadrature)
+#define ENCODER_CPR_OUTPUT   (ENCODER_CPR_MOTOR * GEARBOX_RATIO / 2)  // ~1,788 counts per output turn as counted (half quadrature)
 
 // Position control parameters
 

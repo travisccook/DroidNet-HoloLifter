@@ -25,6 +25,8 @@
 #define MOTOR_REFRESH_MS     150         // Re-send the drive (moving) or the stop (at rest) this often
 #define REST_DRIFT_COUNTS    5           // At rest, re-send stop at once if the encoder moves more than this
 
+#define MOTOR_READY_TIMEOUT_MS 2000       // MotorControl::begin(): give up waiting for the SCMD to report ready
+
 // Direction reversal: stop and wait this long after the last opposite drive
 #define REVERSAL_PAUSE_MS    100
 

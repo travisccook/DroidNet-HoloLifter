@@ -27,6 +27,9 @@ pio test -e native -f "test_wcb_*"   # one family of suites
 python3 -B -m unittest discover -s tools -p 'test_*.py'   # leak scanner
 ```
 
+Run `sh tools/install_hooks.sh` once per clone to install the pre-commit
+leak scan.
+
 `pio run` builds only the real firmware. The `esp32thing_plus_rollbacktest`
 env is a bench image that never starts the mesh (it proves an OTA rollback);
 never flash it by cable.
@@ -83,12 +86,16 @@ Red and black are motor power, not encoder power. Wrong wiring destroys parts.
 ## Safety rules that belong to the code
 
 - Never home on power-up. Homing runs on `home` / `#HLH`, or automatically
-  before the first `up`, `down` or `goto`. Homing state is not saved.
+  before the first `up` or `goto`. `down` never homes: before homing it runs
+  slowly onto the lower switch. Homing state is not saved.
 - Limit switches are normally closed: LOW = not triggered, HIGH = triggered
   or wire broken. Check them every loop before driving the motor; a move
   toward a triggered switch stops.
 - Emergency stop (`stop` / `#HLS`) halts the motor at once (no ramp), is
   handled ahead of any queued command, and also cuts the holofan's power.
+  It never clears an ERROR: only `clear` / `#HLX` does.
+- Every move is watched for a stall and ends in ERROR after
+  MOVEMENT_TIMEOUT_MS at the latest.
 - Maintenance mode disables the motor driver; limits, e-stop and the USB
   console keep running.
 

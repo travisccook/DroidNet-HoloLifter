@@ -43,6 +43,14 @@ void load(nodecfg::NodeConfig& c, uint8_t defaultId, const char* defaultAlias) {
   p.end();
 }
 
+// putString returns the length written: 0 for a failure, but also for an
+// empty string (mesh off, profile cleared), which must still count as saved.
+static bool putStr(Preferences& p, const char* key, const char* v) {
+  size_t n = strlen(v);
+  if (n == 0) { p.putString(key, v); return p.getString(key, "?").length() == 0; }
+  return p.putString(key, v) == n;
+}
+
 bool save(const nodecfg::NodeConfig& c) {
   Preferences p;
   if (!p.begin("hlmesh", false)) return false;
@@ -54,12 +62,12 @@ bool save(const nodecfg::NodeConfig& c) {
   ok &= p.putUChar("ch", c.channel) > 0;
   ok &= p.putUChar("oct2", c.oct2) > 0;
   ok &= p.putUChar("oct3", c.oct3) > 0;
-  p.putString("pw", c.password);          // may be empty (mesh off)
+  ok &= putStr(p, "pw", c.password);      // may be empty (mesh off)
   ok &= p.putBool("crc", c.checksum) > 0;
-  p.putString("s1", c.profile[0].ssid);
-  p.putString("p1", c.profile[0].pass);
-  p.putString("s2", c.profile[1].ssid);
-  p.putString("p2", c.profile[1].pass);
+  ok &= putStr(p, "s1", c.profile[0].ssid);
+  ok &= putStr(p, "p1", c.profile[0].pass);
+  ok &= putStr(p, "s2", c.profile[1].ssid);
+  ok &= putStr(p, "p2", c.profile[1].pass);
   p.end();
   return ok;
 }

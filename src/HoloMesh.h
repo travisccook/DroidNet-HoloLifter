@@ -17,7 +17,8 @@ void holoMeshLoop();
 bool holoMeshTakeStop();
 // USB "mesh ..." console command; `rawLine` keeps its original case.
 void holoMeshUsb(const char* rawLine);
-// USB "hl <#HL...>" bench command: dispatch as if from the mesh, print the reply.
+// USB "hl <#HL...>" bench command: dispatch as if from the mesh, print the
+// reply. `line` is the text after "hl " in its original case.
 void holoMeshBench(const char* line);
 
 #endif

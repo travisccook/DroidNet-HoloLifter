@@ -209,7 +209,9 @@ answers at http://hololifter.local:
          http://hololifter.local/api/ota
 
 The new image must reach the mesh within 30 s of booting, or it rolls back to
-the previous one on its own. Maintenance mode has no password: anyone on that
+the previous one on its own. "Reach" means it received a frame from another
+node of the mesh (a WCB sends a heartbeat about every 10 s), so update with
+a WCB switched on. Maintenance mode has no password: anyone on that
 network can upload firmware while it is on. Details in
 [docs/MAINTENANCE_API.md](docs/MAINTENANCE_API.md).
 

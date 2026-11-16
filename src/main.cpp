@@ -65,20 +65,29 @@ void setup() {
     // Print banner
     printBanner();
 
+    // Initialize relay (holofan control) - FAIL-SAFE: Start in OFF state.
+    // First, so that every fault path below can cut the holofan's power.
+    Console.print(F("Initializing relay... "));
+    pinMode(RELAY_PIN, OUTPUT);
+    digitalWrite(RELAY_PIN, HOLOFAN_OFF);  // Ensure OFF on startup
+    Console.println(F("OK (OFF)"));
+    setHolofanPowerHook(setHolofanPower);
+
     // Initialize I2C
     Wire.begin();
 
-    // Initialize motor driver
+    // Initialize motor driver. Without it the lift cannot move, but the
+    // console and the mesh still start, so the fault can be read (status,
+    // #HLQ) and the node can still be updated.
     Console.print(F("Initializing motor driver... "));
-    if (!motor.begin()) {
+    bool motorOk = motor.begin();
+    if (!motorOk) {
         Console.println(F("FAILED!"));
         Console.println(F("ERROR: Motor driver not found at address 0x5D"));
-        Console.println(F("Check I2C connection and power supply."));
-        while (1) {
-            delay(1000);  // Halt execution
-        }
+        Console.println(F("Check I2C connection and power supply, then restart."));
+    } else {
+        Console.println(F("OK"));
     }
-    Console.println(F("OK"));
 
     // Initialize limit switches
     Console.print(F("Initializing limit switches... "));
@@ -96,6 +105,9 @@ void setup() {
     // Initialize motion controller
     Console.print(F("Initializing motion controller... "));
     motion.begin();
+    if (!motorOk) {
+        motion.motorFault();
+    }
     Console.println(F("OK"));
 
     // Load configuration from EEPROM
@@ -105,16 +117,6 @@ void setup() {
 
     // Initialize command parser (Serial already initialized above)
     // cmdParser.begin(SERIAL_BAUD);  // SKIP - Serial already initialized
-
-    // Initialize relay (holofan control) - FAIL-SAFE: Start in OFF state
-    Console.print(F("Initializing relay... "));
-    pinMode(RELAY_PIN, OUTPUT);
-    digitalWrite(RELAY_PIN, HOLOFAN_OFF);  // Ensure OFF on startup
-    Console.println(F("OK (OFF)"));
-
-    // Route the motion controller's fail-safe holofan cut through the
-    // single relay helper.
-    setHolofanPowerHook(setHolofanPower);
 
     // Join the WCB ESP-NOW mesh (replaces the Serial2 droid bus). Does
     // nothing until a mesh password is configured over USB ("mesh pw ...").
@@ -202,8 +204,10 @@ void processCommand() {
     else if (strcmp(cmd, "position") == 0 || strcmp(cmd, "pos") == 0) {
         // If argument provided, move to that position (alias for goto)
         if (cmdParser.getArgCount() > 0) {
-            int32_t target = cmdParser.getArgInt(0);
-            if (motion.gotoPosition(target)) {
+            int32_t target;
+            if (!cmdParser.getArgIntStrict(0, target)) {
+                cmdParser.sendError("Usage: pos [position]  (a whole number)");
+            } else if (motion.gotoPosition(target)) {
                 cmdParser.sendOK("Moving to target position");
             } else {
                 cmdParser.sendError(motion.getErrorMessage());
@@ -227,16 +231,19 @@ void processCommand() {
     // ===== Movement Commands =====
 
     else if (strcmp(cmd, "home") == 0) {
-        motion.home();
-        cmdParser.sendOK("Homing sequence started");
+        if (motion.home()) {
+            cmdParser.sendOK("Homing sequence started");
+        } else {
+            cmdParser.sendError(motion.getErrorMessage());
+        }
     }
 
     else if (strcmp(cmd, "up") == 0) {
         int32_t distance = 0;
-        if (cmdParser.getArgCount() > 0) {
-            distance = cmdParser.getArgInt(0);
-        }
-        if (!motion.moveUp(distance)) {
+        // A bad distance must not fall back to a continuous move
+        if (cmdParser.getArgCount() > 0 && (!cmdParser.getArgIntStrict(0, distance) || distance <= 0)) {
+            cmdParser.sendError("Usage: up [counts]  (counts: a whole number above 0)");
+        } else if (!motion.moveUp(distance)) {
             cmdParser.sendError(motion.getErrorMessage());
         } else if (distance > 0) {
             cmdParser.sendOK("Moving up by relative distance");
@@ -247,10 +254,9 @@ void processCommand() {
 
     else if (strcmp(cmd, "down") == 0) {
         int32_t distance = 0;
-        if (cmdParser.getArgCount() > 0) {
-            distance = cmdParser.getArgInt(0);
-        }
-        if (!motion.moveDown(distance)) {
+        if (cmdParser.getArgCount() > 0 && (!cmdParser.getArgIntStrict(0, distance) || distance <= 0)) {
+            cmdParser.sendError("Usage: down [counts]  (counts: a whole number above 0)");
+        } else if (!motion.moveDown(distance)) {
             cmdParser.sendError(motion.getErrorMessage());
         } else if (distance > 0) {
             cmdParser.sendOK("Moving down by relative distance");
@@ -265,13 +271,16 @@ void processCommand() {
     }
 
     else if (strcmp(cmd, "reset") == 0 || strcmp(cmd, "clear") == 0) {
-        motion.clearError();
-        cmdParser.sendOK("Error cleared");
+        if (motion.clearError()) {
+            cmdParser.sendOK("Error cleared");
+        } else {
+            cmdParser.sendError(motion.getErrorMessage());
+        }
     }
 
     else if (strcmp(cmd, "goto") == 0) {
-        if (cmdParser.getArgCount() > 0) {
-            int32_t target = cmdParser.getArgInt(0);
+        int32_t target;
+        if (cmdParser.getArgIntStrict(0, target)) {
             if (motion.gotoPosition(target)) {
                 cmdParser.sendOK("Moving to target position");
             } else {
@@ -286,8 +295,11 @@ void processCommand() {
     // ===== Configuration Commands =====
 
     else if (strcmp(cmd, "speed") == 0) {
-        if (cmdParser.getArgCount() > 0) {
-            uint8_t speed = motionprofile::clampSpeed(cmdParser.getArgInt(0, MOTOR_DEFAULT_SPEED));
+        int32_t value;
+        if (cmdParser.getArgCount() > 0 && !cmdParser.getArgIntStrict(0, value)) {
+            cmdParser.sendError("Usage: speed [0-255]");
+        } else if (cmdParser.getArgCount() > 0) {
+            uint8_t speed = motionprofile::clampSpeed(value);
             motion.setSpeed(speed);
 
             Console.print(F("OK speed="));
@@ -353,13 +365,11 @@ void processCommand() {
 
     else if (strcmp(cmd, "hl") == 0) {
         // Send a raw #HL command over USB and print the reply (bench testing)
-        if (cmdParser.getArgCount() > 0) {
-            // CommandParser lowercases the whole line; #HL commands are uppercase.
-            char line[CMD_MAX_TOKEN_LEN + 1];
-            strncpy(line, cmdParser.getArg(0), sizeof(line) - 1);
-            line[sizeof(line) - 1] = '\0';
-            for (char* p = line; *p; ++p) *p = (char)toupper((unsigned char)*p);
-            holoMeshBench(line);
+        // The whole rest of the line in its own case: #HLZKS1=My Home keeps
+        // its spaces, case and length (a token would cut it at 15 characters)
+        const char* rest = cmdParser.getRawArgs();
+        if (rest != nullptr) {
+            holoMeshBench(rest);
             Console.println();
         } else {
             cmdParser.sendError("Usage: hl <#HLxxx>  (e.g. hl #HLF1, hl #HLF0)");
@@ -392,8 +402,10 @@ void processCommand() {
     // ===== Calibration Commands =====
 
     else if (strcmp(cmd, "margin") == 0) {
-        if (cmdParser.getArgCount() > 0) {
-            int32_t margin = cmdParser.getArgInt(0);
+        int32_t margin;
+        if (cmdParser.getArgCount() > 0 && !cmdParser.getArgIntStrict(0, margin)) {
+            cmdParser.sendError("Usage: margin [counts]");
+        } else if (cmdParser.getArgCount() > 0) {
             if (motion.setSoftLimitMargin(margin)) {
                 Console.print(F("OK margin="));
                 Console.println(margin);
@@ -468,6 +480,7 @@ void printHelp() {
     Console.println(F("  relay <on|off>    - Control relay (holofan power)"));
     Console.println(F("  holofan <on|off>  - Power holofan (alias for relay)"));
     Console.println(F("  hl <#HLxxx>       - Run a mesh #HL command locally (e.g. hl #HLQ)"));
+    Console.println(F("                      text after '=' keeps its case and spaces"));
     Console.println();
     Console.println(F("Mesh Node (WCB ESP-NOW):"));
     Console.println(F("  mesh              - Show mesh config and counters"));

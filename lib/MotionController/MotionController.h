@@ -112,19 +112,27 @@ public:
     bool gotoPosition(int32_t target);
 
     /**
-     * Stop all movement (emergency stop)
+     * Stop all movement (emergency stop). Leaves an ERROR latched.
      */
     void stop();
 
     /**
      * Run homing sequence (manual trigger)
+     * @return false if refused (ERROR state or a wiring fault; see getErrorMessage())
      */
-    void home();
+    bool home();
 
     /**
      * Clear error state and return to IDLE
+     * @return false if the fault cannot be cleared (no motor driver)
      */
-    void clearError();
+    bool clearError();
+
+    /**
+     * The motor driver did not start: enter ERROR and keep it (clearError()
+     * refuses) until the node is restarted with a working driver.
+     */
+    void motorFault();
 
     // ===== Status Queries =====
 
@@ -260,6 +268,8 @@ private:
     int32_t softLimitMargin;  // Configurable margin from hard limits
     int32_t homedTravel;      // Switch-to-switch travel measured by homing (0 = not homed)
 
+    bool motorMissing;        // motorFault(): the driver never started
+
     // Rest supervision (IDLE/STOPPED/ERROR): re-send stop, see superviseRest()
     uint32_t restStopMs;
     int32_t restPos;
@@ -292,6 +302,7 @@ private:
 
     bool checkLimits(int8_t dir);  // Stop if a limit switch blocks commanded direction dir
     bool checkStall();            // Detect stalled motor
+    bool checkMoveTimeout();      // A move ran longer than MOVEMENT_TIMEOUT_MS -> ERROR; true if faulted
     bool checkSoftLimits(int8_t direction);  // Check software position limits for given direction (+1=up, -1=down, 0=both)
     void enterErrorState(const char* message);
     bool checkWiring();  // Both switches triggered -> ERROR; true if faulted

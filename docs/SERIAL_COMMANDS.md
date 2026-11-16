@@ -49,21 +49,28 @@ Motion (silent):
 
     #HLU            move up to the upper soft limit (slowing down before it)
                     or until a stop; if not homed yet, runs homing first and
-                    then continues up (#HLS during that homing cancels both)
+                    then continues up (#HLS during that homing cancels both;
+                    a repeated #HLU during it does not start homing over)
     #HLD            move down to the lower soft limit (slowing down before it)
                     or until a stop; if not homed yet, no homing: it runs at
                     the homing-down speed until the lower limit switch stops
                     it, zeroes the position there and stays un-homed
     #HLS            STOP now; also cuts holofan power (fail-safe). Handled
-                    ahead of any queued command; moves (U, D, H, G) that
-                    were queued before it are discarded.
+                    ahead of any queued command; moves (U, D, H, G) still
+                    queued when it is handled are discarded. A WCB's retry
+                    of a #HLS already acted on is ignored. An ERROR stays
+                    an ERROR after #HLS (only #HLX clears it).
     #HLH            run homing
     #HLG<pos>       go to absolute position (encoder counts, may be negative);
                     if not homed yet, runs homing first and then goes to
                     <pos>, checked against the soft limits homing just set
                     (out of range: refused with an ERROR line, the lift stays
                     put); #HLS during that homing cancels both
-    #HLX            clear an ERROR (e.g. after a stall); keeps homing
+    #HLX            clear an ERROR (e.g. after a stall); keeps homing.
+                    Every move ends in ERROR if the motor stalls (no encoder
+                    movement for 0.5 s) or runs longer than 30 s. "Motor
+                    driver not found" cannot be cleared: fix the wiring and
+                    restart.
 
 Configuration (silent; speed and margin auto-save):
 
@@ -142,8 +149,18 @@ stop, reset, speed, margin, relay, ...) and adds:
     up <n> / down <n>   relative move by n counts; homed only (before
                         homing: "ERROR Not homed - relative move refused,
                         home first"). Plain up/down behave like #HLU/#HLD.
+                        n must be a whole number above 0; anything else
+                        ("up -100", "up abc") is refused, as is a number
+                        that is not one for goto, pos, speed and margin.
 
-    hl <#HL...>     run a mesh command locally and print any reply
+    hl <#HL...>     run a mesh command locally and print any reply; the
+                    rest of the line is passed on as typed (text after '='
+                    keeps its case and spaces), and a command typed in
+                    lower case is retried in upper case
+
+A console line ends with CR, LF or CRLF. Lines are handled one per loop
+pass (about 10 ms), in the order received.
+
     mesh            show mesh config and counters (passwords hidden)
     mesh pw <pw>                 mesh password (mesh is OFF until set)
     mesh oct <hh> <hh>           mesh MAC octets 2 and 3 (from ?MAC on a WCB)
@@ -159,8 +176,8 @@ stop, reset, speed, margin, relay, ...) and adds:
     mesh restart                 reboot to apply mesh settings
 
 Everything printed on the USB console is also mirrored to the mesh as WCB
-remote-terminal lines ([TERM:15] in the WCB Wizard terminal) to the WCB that
-last sent the node a command (rate-limited to 20 lines/s).
+remote-terminal lines ([TERM:15] in the WCB Wizard terminal) to the node that
+last sent this node a command it understands (rate-limited to 20 lines/s).
 
 ## Design rationale
 

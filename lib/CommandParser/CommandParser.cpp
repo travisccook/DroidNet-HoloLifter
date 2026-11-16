@@ -27,8 +27,11 @@ void CommandParser::begin(uint32_t baud) {
  * Update command parser
  */
 void CommandParser::update() {
-    // Check for incoming serial data
-    while (Serial.available() > 0) {
+    // Check for incoming serial data. One line at a time: once a command is
+    // ready, the rest stays in the serial buffer until clear(). (Reading on
+    // re-parsed the line at the LF of a CRLF, which lost its arguments, and
+    // glued a second line onto the first.)
+    while (!commandReady && Serial.available() > 0) {
         char c = Serial.read();
 
         // Handle newline (command complete)
@@ -119,6 +122,45 @@ int32_t CommandParser::getArgInt(uint8_t index, int32_t defaultValue) const {
         return atol(arg);
     }
     return defaultValue;
+}
+
+/**
+ * Get argument as integer, strictly: optional '-', then digits only
+ */
+bool CommandParser::getArgIntStrict(uint8_t index, int32_t& out) const {
+    const char* arg = getArg(index);
+    if (arg == nullptr) {
+        return false;
+    }
+    const char* p = arg;
+    if (*p == '-') {
+        p++;
+    }
+    size_t digits = strlen(p);
+    if (digits == 0 || digits > 9) {
+        return false;
+    }
+    for (const char* q = p; *q; q++) {
+        if (*q < '0' || *q > '9') {
+            return false;
+        }
+    }
+    out = atol(arg);
+    return true;
+}
+
+/**
+ * Text after the command word, original case (nullptr if none)
+ */
+const char* CommandParser::getRawArgs() const {
+    const char* p = rawLine;
+    while (*p && !isspace((unsigned char)*p)) {
+        p++;
+    }
+    while (*p && isspace((unsigned char)*p)) {
+        p++;
+    }
+    return *p ? p : nullptr;
 }
 
 /**

@@ -79,6 +79,18 @@ public:
     int32_t getArgInt(uint8_t index, int32_t defaultValue = 0) const;
 
     /**
+     * Get argument as integer, strictly: an optional '-' and up to 9 digits,
+     * nothing else ("12x", "abc" and "" are refused instead of read as 12 / 0)
+     * @return false if the argument is missing or not a number
+     */
+    bool getArgIntStrict(uint8_t index, int32_t& out) const;
+
+    /**
+     * The text after the command word in its original case, or nullptr
+     */
+    const char* getRawArgs() const;
+
+    /**
      * Get argument as float
      * @param index Argument index
      * @param defaultValue Default value if not found or invalid

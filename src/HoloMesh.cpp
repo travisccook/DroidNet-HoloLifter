@@ -30,6 +30,13 @@ static constexpr uint8_t LOCAL_SENDER = 0;      // "hl" bench commands: print, n
 static TermTee            s_console(Serial);
 Print&                    Console = s_console;
 static nodecfg::NodeConfig s_cfg;
+// The mesh identity this boot runs on (id, octets, channel, password).
+// #HLZ / "mesh" changes to s_cfg apply after a reboot, so a radio restart
+// (return from maintenance) must use these, as s_node still does.
+static nodecfg::NodeConfig s_radioCfg;
+static bool               s_nodeBegun = false;
+static uint32_t           s_radioRetryMs = 0;
+static constexpr uint32_t RADIO_RETRY_MS = 5000;
 static wcb::WcbNode       s_node;
 static MeshRadio          s_radio;
 static bool               s_radioUp = false;
@@ -96,8 +103,9 @@ static void reply(uint8_t sender, const char* text) {
 }
 
 static bool radioStart() {
-  if (!s_cfg.password[0]) return false;
-  s_radioUp = s_radio.start(s_cfg, s_node);
+  if (!s_radioCfg.password[0]) return false;
+  s_radioUp = s_radio.start(s_radioCfg, s_node);
+  s_radioRetryMs = millis();
   return s_radioUp;
 }
 
@@ -116,7 +124,7 @@ static void enterMaint(uint8_t profile, uint8_t sender) {
 static void maintLoop() {
   switch (s_maint.poll(millis(), maintserver::hasIp())) {
     case maint::Action::LEAVE_MESH_AND_JOIN: {
-      motor.disable();                              // no motion while off the mesh
+      motor.maintDisable();                         // no motion while off the mesh
       Console.printf("[maint] leaving mesh, joining profile %u (%s)\n", s_maint.profile(),
                      s_cfg.profile[s_maint.profile() - 1].ssid);
       s_node.suspend();
@@ -137,7 +145,7 @@ static void maintLoop() {
       maintserver::stop();
       if (radioStart()) s_node.rejoin();
       if (motion.isMoving()) motion.stop();   // a move commanded while away must not resume on its own
-      motor.enable();
+      motor.maintRestore();                   // stays off if #HLOF / "disable" turned it off
       break;
     case maint::Action::NONE:
       break;
@@ -194,13 +202,30 @@ static void runZ(const nodecfg::ZCmd& z, uint8_t sender) {
 
 // Dispatch one mesh (or "hl" bench) line. Unknown commands are ignored
 // silently on the mesh (actions never reply), reported on USB.
-static void dispatch(uint8_t sender, char* raw) {
+// True if `line` (normalized) is a command for this node.
+static bool isOurs(const char* line) {
+  lift::LiftCmd lc;
+  nodecfg::ZCmd zc;
+  return lift::parseLift(line, lc) || nodecfg::parseZ(line, zc);
+}
+
+static bool dispatch(uint8_t sender, char* raw) {
   char* line = lift::normalizeLine(raw);
   lift::LiftCmd lc;
   nodecfg::ZCmd zc;
   if (lift::parseLift(line, lc)) runLift(lc, sender);
   else if (nodecfg::parseZ(line, zc)) runZ(zc, sender);
-  else if (sender == LOCAL_SENDER) Console.printf("#HL:ERROR badcmd (%s)\n", line);
+  else return false;
+  return true;
+}
+
+// One mesh line: the console mirror (RTERM) follows the node that last sent
+// us a command, not every sender (another node's broadcast reply is not one).
+static void dispatchMesh(uint8_t sender, char* raw) {
+  char* line = lift::normalizeLine(raw);
+  if (!isOurs(line)) return;
+  s_console.setTarget(&s_node, sender);
+  dispatch(sender, line);
 }
 
 static void onPeek(void*, uint8_t, const char* cmd) {
@@ -216,6 +241,7 @@ void holoMeshSetup() {
   bool pending = run && esp_ota_get_state_partition(run, &st) == ESP_OK && st == ESP_OTA_IMG_PENDING_VERIFY;
 
   configstore::load(s_cfg, DEFAULT_ID, DEFAULT_ALIAS);
+  s_radioCfg = s_cfg;
   s_gate.begin(pending, s_cfg.password[0] != '\0', false, millis());
   if (pending) Console.println(F("[ota] new image: must reach the mesh within 30 s or it rolls back"));
 
@@ -245,6 +271,7 @@ void holoMeshSetup() {
     Console.println(F("[mesh] start FAILED (see messages above)"));
     return;
   }
+  s_nodeBegun = true;
   s_console.setTarget(&s_node, 0);
   Console.printf("[mesh] node %u \"%s\" on channel %u, replies %s\n", s_cfg.id, s_cfg.alias, s_cfg.channel, s_cfg.replies ? "broadcast" : "off");
 }
@@ -259,7 +286,10 @@ bool holoMeshTakeStop() {
 
 void holoMeshLoop() {
   s_node.poll();
-  if (s_node.started()) s_gate.meshUp();
+  // "Reached the mesh" = a frame from another node of this mesh was received
+  // on the right MAC with ESP-NOW v2 (WCBs send a heartbeat every ~10 s).
+  // A radio that merely initialised proves nothing about the new image.
+  if (s_node.started() && s_radio.macOk() && s_radio.v2() && s_node.counters().rxOk > 0) s_gate.meshUp();
   switch (s_gate.poll(millis())) {
     case maint::Verdict::VALID:
       esp_ota_mark_app_valid_cancel_rollback();
@@ -287,15 +317,20 @@ void holoMeshLoop() {
         Console.printf("[mesh] dropped %s queued before #HLS\n", norm);
         continue;
       }
-      s_console.setTarget(&s_node, sender);
-      dispatch(sender, line);
+      dispatchMesh(sender, line);
     }
   }
   for (int i = 0; i < 4 && s_maint.state() == maint::State::MESH && s_node.popCommand(sender, line, sizeof(line)); i++) {
-    s_console.setTarget(&s_node, sender);           // RTERM goes to whoever talked to us last
-    dispatch(sender, line);
+    dispatchMesh(sender, line);
   }
   maintLoop();
+  // The radio failed to come back after maintenance: keep trying, or the
+  // node stays off the mesh until someone power-cycles it.
+  if (s_nodeBegun && !s_radioUp && s_maint.state() == maint::State::MESH &&
+      (uint32_t)(millis() - s_radioRetryMs) >= RADIO_RETRY_MS) {
+    Console.println(F("[mesh] radio is down; restarting it"));
+    if (radioStart()) s_node.rejoin();
+  }
 }
 
 void holoMeshUsb(const char* rawLine) {
@@ -321,5 +356,11 @@ void holoMeshBench(const char* line) {
   char buf[wcb::COMMAND_FIELD + 1];
   strncpy(buf, line, sizeof(buf) - 1);
   buf[sizeof(buf) - 1] = '\0';
-  dispatch(LOCAL_SENDER, buf);
+  if (dispatch(LOCAL_SENDER, buf)) return;
+  // Typed in lower case ("hl #hlq"): the command letters are upper case.
+  // Text after '=' (#HLZKS1=..., #HLZKP1=...) keeps its case.
+  strncpy(buf, line, sizeof(buf) - 1);
+  buf[sizeof(buf) - 1] = '\0';
+  for (char* p = buf; *p && *p != '='; ++p) *p = (char)toupper((unsigned char)*p);
+  if (!dispatch(LOCAL_SENDER, buf)) Console.printf("#HL:ERROR badcmd (%s)\n", lift::normalizeLine(buf));
 }

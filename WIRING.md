@@ -239,9 +239,10 @@ PIN  COLOR    FUNCTION       DESTINATION                    WARNING
 PARAMETER                     VALUE
 ────────────────────────────  ─────────────────────────
 Motor gear ratio              297.92:1 (nominal 298:1)
-CPR at motor shaft            12
+CPR at motor shaft            12 (both edges of both channels)
 CPR at output shaft           ~3,575 (12 x 297.92)
-CPR with quadrature (4x)      ~14,300
+Counts the firmware sees      ~1,788 per output turn (half quadrature:
+                              both edges of channel A; computed, untested)
 Encoder voltage range         2.7V - 18V
 Internal pull-ups             Yes (10k ohm)
 ```

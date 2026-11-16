@@ -11,7 +11,7 @@
  * Constructor
  */
 MotorControl::MotorControl(uint8_t address)
-    : i2cAddress(address), currentSpeed(0), lastWriteMs(0), initialized(false) {
+    : i2cAddress(address), currentSpeed(0), lastWriteMs(0), initialized(false), wantEnabled(true) {
 }
 
 /**
@@ -34,8 +34,15 @@ bool MotorControl::begin() {
     // Wait for enumeration (required by SCMD library)
     delay(50);
 
-    // Check if motor driver is ready
+    // Check if motor driver is ready (bounded: a driver that answered its ID
+    // but never reports ready must not hang setup())
+    uint32_t readyStart = millis();
     while (motorDriver.ready() == false) {
+        if (millis() - readyStart > MOTOR_READY_TIMEOUT_MS) {
+            DEBUG_PRINTLN(F("ERROR: Motor driver not ready!"));
+            initialized = false;
+            return false;
+        }
         delay(10);
     }
 
@@ -80,8 +87,7 @@ void MotorControl::earlyStop() {
  */
 void MotorControl::setSpeed(int16_t speed) {
     if (!initialized) {
-        DEBUG_PRINTLN(F("ERROR: Motor driver not initialized!"));
-        return;
+        return;  // MotionController refuses moves in this case (see motorFault())
     }
 
     // Constrain speed to valid range
@@ -155,6 +161,7 @@ void MotorControl::enable() {
         return;
     }
 
+    wantEnabled = true;
     motorDriver.enable();
     DEBUG_PRINTLN(F("Motor driver enabled"));
 }
@@ -167,9 +174,37 @@ void MotorControl::disable() {
         return;
     }
 
+    wantEnabled = false;
     stop();
     motorDriver.disable();
     DEBUG_PRINTLN(F("Motor driver disabled"));
+}
+
+/**
+ * Maintenance mode: driver off, and back to what the user last asked for
+ */
+void MotorControl::maintDisable() {
+    if (!initialized) {
+        return;
+    }
+
+    stop();
+    motorDriver.disable();
+    DEBUG_PRINTLN(F("Motor driver disabled (maintenance)"));
+}
+
+void MotorControl::maintRestore() {
+    if (!initialized || !wantEnabled) {
+        return;
+    }
+
+    stop();
+    motorDriver.enable();
+    DEBUG_PRINTLN(F("Motor driver enabled"));
+}
+
+bool MotorControl::isInitialized() const {
+    return initialized;
 }
 
 /**
