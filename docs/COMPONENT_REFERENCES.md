@@ -52,7 +52,7 @@ This document contains links to datasheets, documentation, and resources for all
 - Library Name: "Serial Controlled Motor Driver" (SCMD)
 - GitHub: https://github.com/sparkfun/SparkFun_Serial_Controlled_Motor_Driver_Arduino_Library
 - Install via Arduino Library Manager or PlatformIO
-- PlatformIO: `sparkfun/SparkFun Serial Controlled Motor Driver@^1.0.3`
+- PlatformIO: `sparkfun/Serial Controlled Motor Driver@^1.0.3` (as in platformio.ini)
 
 **Key Specifications:**
 - I2C Default Address: 0x5D
@@ -93,7 +93,7 @@ void setup() {
 - No-Load Speed: ~80 RPM @ 5V (100 RPM @ 6V)
 - Stall Current: ~1.3A @ 5V (1.6A @ 6V)
 - Stall Torque: 4.0 kg-cm (55 oz-in)
-- Encoder: 12 CPR (motor shaft), ~14,300 CPR (output shaft, quadrature 4x)
+- Encoder: 12 CPR (motor shaft, full quadrature), ~3,575 CPR at the output shaft; the firmware counts half of that, ~1,788 (computed, not measured on the lift)
 
 **Encoder Resources:**
 - Encoder types explained: https://www.pololu.com/docs/0J16/all#4.b

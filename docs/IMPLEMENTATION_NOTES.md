@@ -296,7 +296,10 @@ else {
 
 **File:** `include/config.h`
 
-**Add firmware version info:**
+**Add firmware version info** (the proposal at the time; of these names
+only SERIAL_BAUD is in today's include/config.h, where it is 115200. The
+version is HOLOLIFTER_VERSION; there is no FIRMWARE_VERSION, BOARD_TYPE,
+BUILD_DATE, CMD_PREFIX or RESPONSE_PREFIX):
 ```cpp
 // Firmware Information
 #define FIRMWARE_VERSION "1.0.0"
@@ -525,9 +528,11 @@ Some commands (like homing) take time to complete:
 
 ### 5. Serial Monitor Line Endings
 
-Configure serial monitor to send `CR` or `Both NL & CR`:
+Today's USB console ends a line at CR, LF or CRLF
+(lib/CommandParser/CommandParser.cpp), so any line-ending setting works:
 - Arduino IDE: Dropdown in serial monitor
-- PlatformIO: May need to manually add `\r`
+- PlatformIO: `pio device monitor` sends CRLF by default (its `--eol`
+  option); nothing has to be added by hand
 
 ---
 
