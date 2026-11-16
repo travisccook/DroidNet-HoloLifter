@@ -1,0 +1,25 @@
+{
+  "node": "HoloLifter",
+  "version": "1.0.2",
+  "built_from_commit": "b9751c5",
+  "toolchain": "pio run (pioarduino 55.03.312-1, Arduino-ESP32 3.3.12)",
+  "tested_on_hardware": false,
+  "ota_requires": "a WCB switched on and in range (the new image must receive a mesh frame within 30 s of booting, or it rolls back)",
+  "ota": {
+    "method": "POST",
+    "path": "/api/ota",
+    "content_type": "application/octet-stream"
+  },
+  "files": {
+    "ota": {
+      "file": "hololifter.bin",
+      "size": 1095456,
+      "sha256": "e969210871b26f776707c64d7fcab1a643c2671fc8c85e6086964a6b108eb1af"
+    },
+    "factory": {
+      "file": "hololifter.factory.bin",
+      "size": 1160992,
+      "sha256": "3e9b2d73305b22c9502426478342ebc2b9996cd879d27acdf686fb5c22742d8f"
+    }
+  }
+}

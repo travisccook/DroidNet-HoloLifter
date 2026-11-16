@@ -43,6 +43,7 @@ never flash it by cable.
                     WcbCore NodeConfig MaintCore LiftCommands (shared, pure C++)
     test/           native Unity suites; i2c_scanner is on-hardware only
     tools/          check_private.py (pre-commit leak scan), hlcon.py (USB helper)
+    release/        the built firmware of the last release and its manifest.json
     docs/           SERIAL_COMMANDS, MAINTENANCE_API, WCB_MESH_NOTES, ...
 
 lib/WcbCore, lib/NodeConfig, lib/MaintCore and lib/LiftCommands are shared

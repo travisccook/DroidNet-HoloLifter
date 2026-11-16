@@ -210,11 +210,18 @@ After the first USB flash the lift can be updated without opening the droid.
 Store a Wi-Fi profile (`mesh ssid 1 <name>`, `mesh pass 1 <passphrase>` on the
 USB console, or `#HLZKS` / `#HLZKP` over the mesh), then send `#HLZX1` (or
 `mesh maint 1` on USB). The node leaves the mesh, joins that network and
-answers at http://hololifter.local:
+answers at http://hololifter.local.
+
+**Keep a WCB switched on and in range while you update.** The new image must
+hear the mesh within 30 s of booting, or the lift rolls back to the previous
+image.
 
     curl -X POST -H 'Content-Type: application/octet-stream' \
-         --data-binary @.pio/build/esp32thing_plus/firmware.bin \
+         --data-binary @release/hololifter.bin \
          http://hololifter.local/api/ota
+
+release/hololifter.bin is the built image of the version in
+release/manifest.json; your own build is .pio/build/esp32thing_plus/firmware.bin.
 
 The new image must reach the mesh within 30 s of booting, or it rolls back to
 the previous one on its own. "Reach" means it received a frame from another
